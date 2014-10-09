@@ -15,20 +15,19 @@ def get_version():
 
     return version
 
-def bb_issues(accountname, repo_slug):
-    issue_id = 1
-    while True:
-        url = bb_url.format(accountname=accountname, repo_slug=repo_slug, issue_id=issue_id)
-        response = urllib2.urlopen(url)
-        raw_issue = json.loads(response.read())
-        yield BBissue(**raw_issue)
-        issue_id += 1
-    #     response = urllib2.urlopen(url)
-    # except urllib2.HTTPError as ex:
-    #     raise ValueError("Problem connecting to Bitbucket URL, {url}: {ex}".format(url=url, ex=ex))
-    # raw_issues = json.loads(response.read())['issues']
-    # for raw_issue in raw_issues:
-    #     yield BBissue(**raw_issue)
+def jsonify(url):
+    response = urllib2.urlopen(url)
+    return json.loads(response.read())
+
+def yield_bb_issues(accountname, repo_slug):
+    count = jsonify(bb_url.format(accountname=accountname, repo_slug=repo_slug, issue_id=''))['count']
+    for issue_id in range(count + 1):
+        try:
+            raw_issue = jsonify(bb_url.format(accountname=accountname, repo_slug=repo_slug, issue_id=issue_id))
+        except urllib2.HTTPError:
+            pass
+        else:
+            yield BBissue(**raw_issue)
 
 __version__ = get_version()
 
