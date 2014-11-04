@@ -25,9 +25,9 @@ class GHissue(object):
             labels.append(bbissue.status)
         return labels
         
-    def create(self, token, accountname, repo):
+    def create(self, token=None, user=None, repo=None):
         hub = github.Github(token)
-        self.repo = hub.get_repo('{0}/{1}'.format(accountname, repo))
+        self.repo = hub.get_repo('{0}/{1}'.format(user, repo))
         for label in self.labels:
             self.create_label(label)
         gh_milestone = self.create_milestone(self.milestone)
