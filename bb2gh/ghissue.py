@@ -1,7 +1,11 @@
 import github
 import random
 import textwrap
+import dateutil.parser
 
+def parse_date(date):
+    dateformat = "%m-%d-%Y at %H:%M"
+    return dateutil.parser.parse(date).strftime(dateformat)
 
 class GHissue(object):
     def __init__(self, bbissue, tokens, repo, user):
@@ -23,6 +27,7 @@ class GHissue(object):
         self.url = '{0}/{1}'.format(user, repo)
         self.reporter_repo = self.get_repo(self.reporter)
         self.default_repo = self.get_repo()
+        self.legacy_info = self.get_legacy_info(bbissue)
 
     def get_repo(self, user=None):
         token = self.tokens.get(user, self.tokens['default'])
@@ -44,7 +49,7 @@ class GHissue(object):
         if gh_milestone:
             extra_args['milestone'] = gh_milestone
         issue = self.reporter_repo.create_issue(self.title,
-                                                body=self.body,
+                                                body=self.body + self.legacy_info,
                                                 **extra_args)
         issue.edit(state=self.state, labels=self.labels)
         for comment in self.comments[::-1]:
@@ -54,7 +59,7 @@ class GHissue(object):
         user = comment['author_info']['username']
         repo = self.get_repo(user)
         _issue = repo.get_issue(issue.number)
-        _issue.create_comment(comment['content'])
+        _issue.create_comment(comment['content'] + self.get_comment_info(comment))
 
     def create_label(self, label):
         r = lambda: random.randint(0, 255)
@@ -94,4 +99,33 @@ class GHissue(object):
                               initial_indent='')
             linelist.append(s)
         return '\n'.join(linelist)
+
+
+    
+    def get_legacy_info(self, bbissue):
+        fargs = bbissue.resource_uri.split('/')[-4:-2] + [bbissue.local_id]
+        url = "https://bitbucket.org/{0}/{1}/issue/{2}".format(*fargs)
+        issue_string = '[{0}]({1})'.format(bbissue.local_id, url)
+
+        created = parse_date(bbissue.utc_created_on)
+        modified = parse_date(bbissue.utc_last_updated)
         
+        legacy_info = u"""
+        \n\n _Imported from Bitbucket issue {issue_string},  created by {reporter} on {created}, last modified: {modified}_\n
+        """.format(issue_string=issue_string,
+                   reporter=bbissue.reported_by['username'],
+                   created=created,
+                   modified=modified)
+        
+        return legacy_info
+        
+    def get_comment_info(self, comment):
+        created = parse_date(comment['utc_created_on'])
+        reporter = comment['author_info']['username']
+        
+        legacy_info = u"""
+        \n\n_Trac comment by {reporter} on {created}_\n
+        """.format(reporter=reporter,
+                   created=created)
+        
+        return legacy_info
