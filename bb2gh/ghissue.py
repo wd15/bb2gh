@@ -4,7 +4,7 @@ import textwrap
 
 
 class GHissue(object):
-    def __init__(self, bbissue):
+    def __init__(self, bbissue, tokens, repo, user):
         self.title = bbissue.title
         self.body = bbissue.content
         if hasattr(bbissue, 'responsible'):
@@ -18,17 +18,24 @@ class GHissue(object):
             self.state = 'closed'
         self.labels = self.get_labels(bbissue)
         self.comments = bbissue.comments
+        self.reporter = bbissue.reported_by['username']
+        self.tokens = tokens
+        self.url = '{0}/{1}'.format(user, repo)
+        self.reporter_repo = self.get_repo(self.reporter)
+        self.default_repo = self.get_repo()
 
+    def get_repo(self, user=None):
+        token = self.tokens.get(user, self.tokens['default'])
+        hub = github.Github(token)
+        return hub.get_repo(self.url)
+        
     def get_labels(self, bbissue):
-        labels = [bbissue.metadata['kind'],
-                  bbissue.metadata['component']]
+        labels = [l for l in (bbissue.metadata['kind'], bbissue.metadata['component']) if l is not None]
         if bbissue.status in ['wontfix', 'duplicate', 'invalid']:
             labels.append(bbissue.status)
         return labels
         
-    def create(self, token=None, user=None, repo=None):
-        hub = github.Github(token)
-        self.repo = hub.get_repo('{0}/{1}'.format(user, repo))
+    def create(self):
         for label in self.labels:
             self.create_label(label)
         gh_milestone = self.create_milestone(self.milestone)
@@ -36,27 +43,35 @@ class GHissue(object):
         extra_args = dict()
         if gh_milestone:
             extra_args['milestone'] = gh_milestone
-        issue = self.repo.create_issue(self.title,
-                                       body=self.body,
-                                       **extra_args)
+        issue = self.reporter_repo.create_issue(self.title,
+                                                body=self.body,
+                                                **extra_args)
         issue.edit(state=self.state, labels=self.labels)
         for comment in self.comments[::-1]:
-            issue.create_comment(comment['content'])
+            self.create_comment(issue, comment)
+
+    def create_comment(self, issue, comment):
+        user = comment['author_info']['username']
+        repo = self.get_repo(user)
+        _issue = repo.get_issue(issue.number)
+        _issue.create_comment(comment['content'])
 
     def create_label(self, label):
         r = lambda: random.randint(0, 255)
-        labels = [l.name for l in self.repo.get_labels()]
+        labels = [l.name for l in self.default_repo.get_labels()]
         if label not in labels:
             color = '%02X%02X%02X' % (r(),r(),r())
-            self.repo.create_label(label, color)
+            print 'label',label
+            print 'color',color
+            self.default_repo.create_label(label, color)
 
     def create_milestone(self, milestone):
         gh_milestone = None
-        for m in self.repo.get_milestones():
+        for m in self.default_repo.get_milestones():
             if milestone == m._title.value:
                 gh_milestone = m
         if not gh_milestone and milestone:
-            gh_milestone = self.repo.create_milestone(milestone)
+            gh_milestone = self.default_repo.create_milestone(milestone)
         return gh_milestone
     
 

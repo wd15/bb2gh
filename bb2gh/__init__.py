@@ -44,8 +44,8 @@ def migrate(config_yaml, verbose=False, issue_ids=None):
     with open(config_yaml, 'r') as f:
         config_data = yaml.load(f)
     for bitbucket_issue in yield_bb_issues(issue_ids=issue_ids, **config_data['bitbucket']):
-        github_issue = GHissue(bitbucket_issue)
-        github_issue.create(**config_data['github'])
+        github_issue = GHissue(bitbucket_issue, tokens=config_data['tokens'], **config_data['github'])
+        github_issue.create()
         if verbose:
             print github_issue
         
