@@ -17,6 +17,7 @@ class GHissue(object):
         else:
             self.state = 'closed'
         self.labels = self.get_labels(bbissue)
+        self.comments = bbissue.comments
 
     def get_labels(self, bbissue):
         labels = [bbissue.metadata['kind'],
@@ -39,6 +40,8 @@ class GHissue(object):
                                        body=self.body,
                                        **extra_args)
         issue.edit(state=self.state, labels=self.labels)
+        for comment in self.comments[::-1]:
+            issue.create_comment(comment['content'])
 
     def create_label(self, label):
         r = lambda: random.randint(0, 255)
