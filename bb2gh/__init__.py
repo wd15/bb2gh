@@ -23,11 +23,9 @@ def jsonify(url):
     response = urllib2.urlopen(url)
     return json.loads(response.read())
 
-def yield_bb_issues(user=None, repo=None, issue_ids=None):
+def yield_bb_issues(user=None, repo=None, issue_ids=None, max_id=4000, min_id=1):
     if not issue_ids:
-        count = jsonify(bb_url.format(user=user, repo=repo, issue_id=''))['count']
-        issue_ids = range(count + 1)
-        
+        issue_ids = range(min_id, max_id + 1)
     for issue_id in issue_ids:
         try:
             format_url = bb_url.format(user=user, repo=repo, issue_id=issue_id)
@@ -39,11 +37,12 @@ def yield_bb_issues(user=None, repo=None, issue_ids=None):
             issue = BBissue(**raw_issue)
             issue.comments = comments
             yield issue
+        issue_id += 1
 
-def migrate(config_yaml, verbose=False, issue_ids=None):
+def migrate(config_yaml, verbose=False, issue_ids=None, min_id=1, max_id=4000):
     with open(config_yaml, 'r') as f:
         config_data = yaml.load(f)
-    for bitbucket_issue in yield_bb_issues(issue_ids=issue_ids, **config_data['bitbucket']):
+    for bitbucket_issue in yield_bb_issues(issue_ids=issue_ids, min_id=min_id, max_id=max_id, **config_data['bitbucket']):
         github_issue = GHissue(bitbucket_issue, tokens=config_data['tokens'], **config_data['github'])
         github_issue.create()
         if verbose:
